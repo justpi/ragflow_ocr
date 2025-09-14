@@ -143,6 +143,15 @@ done < "${TEMPLATE_FILE}"
 export LD_LIBRARY_PATH="/usr/lib/x86_64-linux-gnu/"
 PY=python3
 
+
+# -----------------------------------------------------------------------------
+# Add paddle Ocr package
+# -----------------------------------------------------------------------------
+"$PY" -m ensurepip --upgrade || true
+"$PY" -m pip install -U pip setuptools wheel || true
+"$PY" -m pip install paddlepaddle -i https://www.paddlepaddle.org.cn/packages/stable/cpu/
+"$PY" -m pip install paddleocr
+
 # -----------------------------------------------------------------------------
 # Function(s)
 # -----------------------------------------------------------------------------

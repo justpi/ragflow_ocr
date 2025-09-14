@@ -1,6 +1,11 @@
 ragflow:
   host: ${RAGFLOW_HOST:-0.0.0.0}
   http_port: 9380
+  environment:
+    CHAT_IMAGE_OCR: "true"
+    CHAT_IMAGE_OCR_MODE: "append"   # or "append"
+    CHAT_IMAGE_OCR_MAX_CHARS: "4000"
+    CHAT_IMAGE_OCR_LANG: "ch"
 mysql:
   name: '${MYSQL_DBNAME:-rag_flow}'
   user: '${MYSQL_USER:-root}'

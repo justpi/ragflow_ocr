@@ -32,6 +32,60 @@ from api.utils.api_utils import get_data_error_result, get_json_result, server_e
 from rag.prompts.prompt_template import load_prompt
 from rag.prompts.prompts import chunks_format
 
+import os
+import logging
+from api.utils.ocr_utils import ocr_images_to_text
+from api.utils.blob_loader import load_image_bytes_from_doc_ids
+logger = logging.getLogger(__name__)
+
+CHAT_IMAGE_OCR = os.getenv("CHAT_IMAGE_OCR", "true").lower() == "true"
+CHAT_IMAGE_OCR_MODE = os.getenv("CHAT_IMAGE_OCR_MODE", "append")  # system|append
+CHAT_IMAGE_OCR_MAX_CHARS = int(os.getenv("CHAT_IMAGE_OCR_MAX_CHARS", "4000"))
+CHAT_IMAGE_OCR_HEADER = os.getenv("CHAT_IMAGE_OCR_HEADER", "Image OCR Context")
+
+
+def inject_ocr_into_messages(req, msg):
+    """
+    在进入 chat() 之前，将本轮上传的图像做 OCR，并以 system/append 方式注入到消息中。
+    - 图像来源优先从 req['images'] 读取；其次从即将送入 chat() 的 msg[*].images 读取。
+    """
+    try:
+        if not CHAT_IMAGE_OCR:
+            return
+        images = []
+        # 1) 直接从请求体取（推荐前端传这里）
+        if isinstance(req.get("images"), list):
+            images.extend(req["images"])
+        # 2) 再从消息里取（与 chat 真实入参一致，不依赖 req["messages"]）
+        for _m in msg:
+            if isinstance(_m, dict) and isinstance(_m.get("images"), list):
+                images.extend(_m["images"])
+        _m = msg[-1]
+        doc_ids = []
+        if isinstance(_m, dict) and isinstance(_m.get("doc_ids"), list):
+            doc_ids.extend(_m["doc_ids"])
+        if doc_ids:
+            img_bytes_list = load_image_bytes_from_doc_ids(doc_ids)
+            images.extend(img_bytes_list)
+
+        if not images:
+            return
+        ocr_text = ocr_images_to_text(images)
+        if not ocr_text:
+            return
+        if len(ocr_text) > CHAT_IMAGE_OCR_MAX_CHARS:
+            ocr_text = ocr_text[:CHAT_IMAGE_OCR_MAX_CHARS] + "\n[TRUNCATED]"
+        if CHAT_IMAGE_OCR_MODE == "system":
+            msg.insert(0, {"role": "system", "content": f"{CHAT_IMAGE_OCR_HEADER}:\n{ocr_text}"})
+        else:
+            # 追加到最近一条 user 消息
+            for _m in reversed(msg):
+                if _m.get("role") == "user":
+                    _m["content"] = (_m.get("content") or "") + f"\n\n### {CHAT_IMAGE_OCR_HEADER}\n{ocr_text}"
+                    break
+    except Exception as _e:
+        # OCR 失败不阻断主流程
+        logger.warning("chat image ocr failed: %s", _e, exc_info=True)
 
 @manager.route("/set", methods=["POST"])  # noqa: F821
 @login_required
@@ -220,6 +274,7 @@ def completion():
         def stream():
             nonlocal dia, msg, req, conv
             try:
+                inject_ocr_into_messages(req, msg)
                 for ans in chat(dia, msg, True, **req):
                     ans = structure_answer(conv, ans, message_id, conv.id)
                     yield "data:" + json.dumps({"code": 0, "message": "", "data": ans}, ensure_ascii=False) + "\n\n"
@@ -239,6 +294,8 @@ def completion():
             return resp
 
         else:
+            # 非流式同样注入 OCR，保持行为一致
+            inject_ocr_into_messages(req, msg)
             answer = None
             for ans in chat(dia, msg, **req):
                 answer = structure_answer(conv, ans, message_id, conv.id)

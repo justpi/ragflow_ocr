@@ -30,7 +30,6 @@ from rag.utils import singleton, get_float
 from api.utils.file_utils import get_project_base_directory
 from rag.utils.doc_store_conn import DocStoreConnection, MatchExpr, OrderByExpr, MatchTextExpr, MatchDenseExpr, \
     FusionExpr
-from rag.nlp import is_english, rag_tokenizer
 
 ATTEMPT_TIME = 2
 
@@ -509,6 +508,7 @@ class ESConnection(DocStoreConnection):
         return res_fields
 
     def getHighlight(self, res, keywords: list[str], fieldnm: str):
+        from rag.nlp import is_english
         ans = {}
         for d in res["hits"]["hits"]:
             hlts = d.get("highlight")
@@ -534,6 +534,7 @@ class ESConnection(DocStoreConnection):
         return ans
 
     def getAggregation(self, res, fieldnm: str):
+        from rag.nlp import rag_tokenizer
         agg_field = "aggs_" + fieldnm
         if "aggregations" not in res or agg_field not in res["aggregations"]:
             return list()

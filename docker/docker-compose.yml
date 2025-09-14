@@ -38,6 +38,9 @@ services:
       - ../history_data_agent:/ragflow/history_data_agent
       - ./service_conf.yaml.template:/ragflow/conf/service_conf.yaml.template
       - ./entrypoint.sh:/ragflow/entrypoint.sh
+      - ../api:/ragflow/api
+      - ../rag:/ragflow/rag
+      - ../deepdoc:/ragflow/deepdoc         # 若你改了 deepdoc 代码
     env_file: .env
     environment:
       - TZ=${TIMEZONE}
