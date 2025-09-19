@@ -19,6 +19,9 @@ services:
       - ./nginx/ragflow.conf:/etc/nginx/conf.d/ragflow.conf
       - ./nginx/proxy.conf:/etc/nginx/proxy.conf
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ../api:/ragflow/api
+      - ../rag:/ragflow/rag
+      - ../deepdoc:/ragflow/deepdoc         # 若你改了 deepdoc 代码
     env_file: .env
     environment:
       - TZ=${TIMEZONE}
